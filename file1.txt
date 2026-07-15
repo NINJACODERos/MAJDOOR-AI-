@@ -1,2 +1,4 @@
 g4f
 pyttsx3
+streamlit
+gtts
