@@ -1,2 +1,4 @@
 rustc
 cargo
+chromium
+chromium-driver
