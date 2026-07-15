@@ -1,3 +1,12 @@
-g4f[all]
 streamlit
-gtts
+g4f[all]
+beautifulsoup4
+pillow
+aiohttp
+requests
+ddgs
+g4f[image]
+duckduckai
+duck-chat
+DDGS
+gTTS
