@@ -1,5 +1,5 @@
 streamlit
-g4f[all]
+g4f
 beautifulsoup4
 pillow
 aiohttp
