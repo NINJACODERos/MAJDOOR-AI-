@@ -15,12 +15,11 @@ except Exception:
     pass
 
 # 🔊 Native g4f audio — pure g4f.Provider wrapper, no direct edge_tts calls.
-# PollinationsAI's audio model was renamed from "openai-audio" (retired/404)
-# to "gpt-4o-mini-audio". This is the real g4f.dev audio pathway.
+# OpenAIFM's audio model "gpt-4o-mini-tts" is the g4f.dev audio pathway.
 try:
-    from g4f.Provider import PollinationsAI
+    from g4f.Provider import OpenAIFM
 except ImportError:
-    PollinationsAI = None
+    OpenAIFM = None
 
 # 🔧 Fallback for search: try g4f.internet.search, else use DuckDuckGo/ddgs
 try:
@@ -204,29 +203,40 @@ def search_image_ddg(query, retries=2, delay=2, count=7):
     return [], f"Duck image search error: {last_error}"
 
 
-# 🔊 Native g4f audio generation — PollinationsAI only, pure g4f wrapper.
-# Model renamed from "openai-audio" (retired) to "gpt-4o-mini-audio".
+# 🔊 Native g4f audio generation — OpenAIFM, using gpt-4o-mini-tts.
 def generate_audio_native(prompt: str):
-    if PollinationsAI is None:
-        return None, "PollinationsAI provider not available in this g4f install."
+    if OpenAIFM is None:
+        return None, "OpenAIFM provider not available."
 
     try:
-        client = G4FClient(provider=PollinationsAI)
+        client = G4FClient(provider=OpenAIFM)
+
         response = client.media.generate(
             prompt,
-            model="gpt-4o-mini-audio",
-            audio={"voice": "alloy", "format": "mp3"},
+            model="gpt-4o-mini-tts",
+            audio={
+                "voice": "coral",
+                "format": "mp3"
+            }
         )
+
         item = response.data[0]
+
+        if getattr(item, "data", None):
+            return item.data, None
+
         if getattr(item, "b64_json", None):
             return base64.b64decode(item.b64_json), None
+
         if getattr(item, "url", None):
-            r = requests.get(item.url, timeout=20)
+            r = requests.get(item.url, timeout=30)
             if r.ok:
                 return r.content, None
-        return None, "PollinationsAI returned no usable audio data (no b64_json or url)."
+
+        return None, "No audio returned."
+
     except Exception as e:
-        return None, f"PollinationsAI audio failed: {e}"
+        return None, str(e)
 
 
 # 💡 Web/Image/Audio triggers
@@ -245,7 +255,7 @@ def handle_triggered_response(text):
             reply_text = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch nahi mila.")
             reply_text = strip_reasoning(reply_text)
             
-            # 2. Convert to Audio using native g4f audio (PollinationsAI, gpt-4o-mini-audio)
+            # 2. Convert to Audio using native g4f audio (OpenAIFM, gpt-4o-mini-tts)
             audio_data, err = generate_audio_native(reply_text)
             if audio_data is None:
                 return f"❌ Audio banne mein error aa gaya majdoor bhai: {err}"
