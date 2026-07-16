@@ -2,9 +2,7 @@
 beautifulsoup4
 aiohttp
 requests
-ddgs
-g4f[image]
-streamlit==1.36.0
-g4f[all]==0.3.1.2
+streamlit
+g4f[all]
 nest_asyncio
 Pillow
