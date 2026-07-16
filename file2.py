@@ -1,5 +1,5 @@
 import sys, os, re, time, io, base64, asyncio, requests, streamlit as st
-from yt_dlp import YoutubeDL
+from youtubesearchpython import VideosSearch
 import edge_tts
 
 # 🔧 Point g4f's cookie/HAR storage at a writable directory (Streamlit Cloud's
@@ -241,28 +241,19 @@ def generate_audio_native(prompt: str):
 
 def search_youtube(query):
     try:
-        ydl_opts = {
-            "quiet": True,
-            "extract_flat": True,
-            "default_search": "ytsearch1",
-        }
+        videos = VideosSearch(query, limit=1).result()
 
-        with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(query, download=False)
-
-        if "entries" in info and info["entries"]:
-            vid = info["entries"][0]["id"]
-            title = info["entries"][0]["title"]
-
+        if videos["result"]:
+            video = videos["result"][0]
             return {
-                "url": f"https://www.youtube.com/watch?v={vid}",
-                "title": title
+                "url": video["link"],
+                "title": video["title"]
             }
+
+        return {"error": "No results"}
 
     except Exception as e:
         return {"error": str(e)}
-
-    return None
 
 
 # 💡 Web/Image/Audio triggers
@@ -355,6 +346,9 @@ def handle_triggered_response(text):
                 "url": result["url"],
                 "title": result["title"]
             }
+
+        if result and "error" in result:
+            return f"❌ {result['error']}"
 
         return "❌ Video nahi mila."
 
