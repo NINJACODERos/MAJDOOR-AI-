@@ -1,8 +1,20 @@
 
 beautifulsoup4
 aiohttp
-requests
-streamlit
 g4f
 nest_asyncio
 Pillow
+streamlit
+g4f[image]
+ddgs
+requests
+
+# Optional — only if you keep the dd/ text search + duck/ Duck.ai commands:
+duckduckai
+duck-chat
+
+# NOTE: gTTS is no longer needed. Native g4f audio (PollinationsAI
+# "openai-audio" / OpenAIFM "gpt-4o-mini-tts") is used instead, which is
+# exactly what powers g4f.dev's audio feature. This removes an extra
+# text -> TTS conversion step, since the reply text still comes from the
+# chat model and is then voiced by g4f's own audio-capable providers.
