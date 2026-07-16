@@ -213,7 +213,7 @@ async def _edge_tts(text):
 
     communicate = edge_tts.Communicate(
         text=text,
-        voice="hi-IN-MadhurNeural"
+        voice="hi-IN-SwaraNeural"
     )
 
     await communicate.save(output)
