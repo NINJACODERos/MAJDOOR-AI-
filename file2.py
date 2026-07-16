@@ -283,34 +283,36 @@ def handle_triggered_response(text):
         except Exception as e:
             return f"❌ Audio banne mein error aa gaya majdoor bhai: {e}"
             
-    # Prefix dd/: DuckDuckGo/ddgs text search
-   elif text.startswith("dd/ "):
-    query = text[4:].strip()
+        # Prefix dd/: DuckDuckGo/ddgs text search
+    elif text.startswith("dd/ "):
+        query = text[4:].strip()
 
-    try:
-        with DDGS() as ddgs:
-            items = list(
-                ddgs.text(
-                    query,
-                    region="wt-wt",
-                    safesearch="Off",
-                    max_results=7
+        try:
+            with DDGS() as ddgs:
+                items = list(
+                    ddgs.text(
+                        query,
+                        region="wt-wt",
+                        safesearch="Off",
+                        max_results=7
+                    )
                 )
-            )
 
-        if items:
-            result = "🌐 Search results:\n\n"
+            if items:
+                result = "🌐 Search results:\n\n"
 
-            for i, item in enumerate(items, 1):
-                result += f"{i}. {item.get('title')}\n"
-                result += f"{item.get('href')}\n\n"
+                for i, item in enumerate(items, 1):
+                    result += f"{i}. {item.get('title')}\n"
+                    result += f"{item.get('href')}\n\n"
 
-            return result
+                return result
 
-        return "❌ Kuch nahi mila."
+            return "❌ Kuch nahi mila."
 
-    except Exception as e:
-        return f"❌ Search error: {e}"
+        except Exception as e:
+            return f"❌ Search error: {e}"
+
+    # Prefix duck/: Duck.ai text chat
 
     # Prefix duck/: Duck.ai text chat
     elif text.startswith("duck/ "):
