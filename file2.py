@@ -208,6 +208,11 @@ def search_image_ddg(query, retries=2, delay=2, count=7):
 import tempfile
 
 async def _edge_tts(text):
+    # Fix: kabhi-kabhi -> kabhi kabhi (replace hyphens between words with space)
+    text = re.sub(r'(?<=\w)-(?=\w)', ' ', text)
+    # Clean up repeated whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
         output = f.name
 
@@ -346,7 +351,13 @@ for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"], avatar=role):
         st.write(msg["content"])
         if "audio" in msg and msg["audio"]:
-            st.audio(msg["audio"], format="audio/mp3")
+            # Fix: Auto-play audio using base64 encoding
+            audio_b64 = base64.b64encode(msg["audio"]).decode()
+            st.markdown(f"""
+<audio controls autoplay>
+    <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
+</audio>
+""", unsafe_allow_html=True)
 
 # 🪟 Clear
 col1, col2 = st.columns([6, 1])
