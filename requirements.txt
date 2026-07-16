@@ -5,4 +5,4 @@ ddgs
 duckduckai
 duck-chat
 edge-tts
-yt-dlp
+youtube-search-python
