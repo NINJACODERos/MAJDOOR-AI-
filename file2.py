@@ -1,4 +1,5 @@
 import sys, os, re, time, io, base64, asyncio, requests, streamlit as st
+import edge_tts
 
 # 🔧 Point g4f's cookie/HAR storage at a writable directory (Streamlit Cloud's
 # filesystem is ephemeral/restricted, so g4f's default path can fail).
@@ -203,38 +204,31 @@ def search_image_ddg(query, retries=2, delay=2, count=7):
     return [], f"Duck image search error: {last_error}"
 
 
-# 🔊 Native g4f audio generation — OpenAIFM, using gpt-4o-mini-tts.
+# 🔊 Native g4f audio generation — edge_tts
+import tempfile
+
+async def _edge_tts(text):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+        output = f.name
+
+    communicate = edge_tts.Communicate(
+        text=text,
+        voice="en-US-AvaMultilingualNeural"
+    )
+
+    await communicate.save(output)
+
+    with open(output, "rb") as f:
+        data = f.read()
+
+    os.remove(output)
+    return data
+
+
 def generate_audio_native(prompt: str):
-    if OpenAIFM is None:
-        return None, "OpenAIFM provider not available."
-
     try:
-        client = G4FClient(provider=OpenAIFM)
-
-        response = client.media.generate(
-            prompt,
-            model="gpt-4o-mini-tts",
-            audio={
-                "voice": "coral",
-                "format": "mp3"
-            }
-        )
-
-        item = response.data[0]
-
-        if getattr(item, "data", None):
-            return item.data, None
-
-        if getattr(item, "b64_json", None):
-            return base64.b64decode(item.b64_json), None
-
-        if getattr(item, "url", None):
-            r = requests.get(item.url, timeout=30)
-            if r.ok:
-                return r.content, None
-
-        return None, "No audio returned."
-
+        audio = asyncio.run(_edge_tts(prompt))
+        return audio, None
     except Exception as e:
         return None, str(e)
 
@@ -255,7 +249,7 @@ def handle_triggered_response(text):
             reply_text = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch nahi mila.")
             reply_text = strip_reasoning(reply_text)
             
-            # 2. Convert to Audio using native g4f audio (OpenAIFM, gpt-4o-mini-tts)
+            # 2. Convert to Audio using edge-tts
             audio_data, err = generate_audio_native(reply_text)
             if audio_data is None:
                 return f"❌ Audio banne mein error aa gaya majdoor bhai: {err}"
