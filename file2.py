@@ -1,4 +1,4 @@
-import sys, os, re, time, io, base64, requests, streamlit as st
+import sys, os, re, time, io, base64, asyncio, requests, streamlit as st
 
 # 🔧 Point g4f's cookie/HAR storage at a writable directory (Streamlit Cloud's
 # filesystem is ephemeral/restricted, so g4f's default path can fail).
@@ -14,16 +14,17 @@ try:
 except Exception:
     pass
 
-# 🔊 Native g4f audio providers.
-# EdgeTTS is tried FIRST — it's Microsoft's own free TTS via the edge_tts
-# package, needs no API key, and (unlike OpenAIFM/PollinationsAI) isn't
-# gated behind a Vercel bot-check or a renamed/legacy model endpoint, so
-# it's the most reliable option when running from a cloud host like
-# Streamlit Cloud / Render.
+# 🔊 Audio providers.
+# We call the `edge_tts` package DIRECTLY (not through g4f.Provider.EdgeTTS),
+# because g4f's EdgeTTS wrapper currently throws `VoicesManager is not
+# defined` — a bug inside g4f itself, not our code. Calling edge_tts
+# directly gets the exact same free Microsoft voice service, no g4f bug,
+# no API key, no bot-check wall.
 try:
-    from g4f.Provider import EdgeTTS
+    import edge_tts
 except ImportError:
-    EdgeTTS = None
+    edge_tts = None
+
 try:
     from g4f.Provider import OpenAIFM
 except ImportError:
@@ -61,7 +62,6 @@ except ImportError:
 
 # duck_chat as a second option
 try:
-    import asyncio
     from duck_chat import DuckChat
 except ImportError:
     DuckChat = None
@@ -216,30 +216,37 @@ def search_image_ddg(query, retries=2, delay=2, count=7):
     return [], f"Duck image search error: {last_error}"
 
 
-# 🔊 Native g4f audio generation.
-# Order: EdgeTTS (free, no key, most reliable on cloud hosts) ->
-#        OpenAIFM (gpt-4o-mini-tts, coral voice) ->
-#        PollinationsAI (gpt-4o-mini-audio, alloy voice — renamed from
-#        the old "openai-audio" model, which is now legacy/broken).
+# 🔊 Audio generation.
+# Order: direct edge_tts (free, no key, bypasses g4f's buggy EdgeTTS
+# wrapper) -> OpenAIFM -> PollinationsAI. Each is a separate fallback
+# in case one is down/blocked.
+def _edge_tts_generate_sync(text: str, voice: str = "hi-IN-MadhurNeural") -> bytes:
+    async def _run():
+        communicate = edge_tts.Communicate(text, voice)
+        audio_bytes = b""
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_bytes += chunk["data"]
+        return audio_bytes
+
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(_run())
+    finally:
+        loop.close()
+
+
 def generate_audio_native(prompt: str):
     errors = []
 
-    if EdgeTTS is not None:
+    if edge_tts is not None:
         try:
-            client = G4FClient(provider=EdgeTTS)
-            response = client.media.generate(
-                prompt,
-                audio={"language": "hi"},
-            )
-            item = response.data[0]
-            if getattr(item, "b64_json", None):
-                return base64.b64decode(item.b64_json), None
-            if getattr(item, "url", None):
-                r = requests.get(item.url, timeout=20)
-                if r.ok:
-                    return r.content, None
+            audio_bytes = _edge_tts_generate_sync(prompt, voice="hi-IN-MadhurNeural")
+            if audio_bytes:
+                return audio_bytes, None
         except Exception as e:
-            errors.append(f"EdgeTTS failed: {e}")
+            errors.append(f"edge_tts (direct) failed: {e}")
 
     if OpenAIFM is not None:
         try:
@@ -296,7 +303,7 @@ def handle_triggered_response(text):
             reply_text = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch nahi mila.")
             reply_text = strip_reasoning(reply_text)
             
-            # 2. Convert to Audio using native g4f audio (EdgeTTS -> OpenAIFM -> PollinationsAI)
+            # 2. Convert to Audio (direct edge_tts -> OpenAIFM -> PollinationsAI)
             audio_data, err = generate_audio_native(reply_text)
             if audio_data is None:
                 return f"❌ Audio banne mein error aa gaya majdoor bhai: {err}"
@@ -411,5 +418,4 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True
-                   )
-    
+)
