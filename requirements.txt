@@ -1,9 +1,7 @@
 streamlit
-git+https://github.com/xtekky/gpt4free.git
+g4f[image]
 requests
 ddgs
 duckduckai
 duck-chat
-httpx
-aiohttp
-pydub
+edge-tts
