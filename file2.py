@@ -14,21 +14,9 @@ try:
 except Exception:
     pass
 
-# 🔊 Audio providers.
-# We call the `edge_tts` package DIRECTLY (not through g4f.Provider.EdgeTTS),
-# because g4f's EdgeTTS wrapper currently throws `VoicesManager is not
-# defined` — a bug inside g4f itself, not our code. Calling edge_tts
-# directly gets the exact same free Microsoft voice service, no g4f bug,
-# no API key, no bot-check wall.
-try:
-    import edge_tts
-except ImportError:
-    edge_tts = None
-
-try:
-    from g4f.Provider import OpenAIFM
-except ImportError:
-    OpenAIFM = None
+# 🔊 Native g4f audio — pure g4f.Provider wrapper, no direct edge_tts calls.
+# PollinationsAI's audio model was renamed from "openai-audio" (retired/404)
+# to "gpt-4o-mini-audio". This is the real g4f.dev audio pathway.
 try:
     from g4f.Provider import PollinationsAI
 except ImportError:
@@ -216,75 +204,29 @@ def search_image_ddg(query, retries=2, delay=2, count=7):
     return [], f"Duck image search error: {last_error}"
 
 
-# 🔊 Audio generation.
-# Order: direct edge_tts (free, no key, bypasses g4f's buggy EdgeTTS
-# wrapper) -> OpenAIFM -> PollinationsAI. Each is a separate fallback
-# in case one is down/blocked.
-def _edge_tts_generate_sync(text: str, voice: str = "hi-IN-MadhurNeural") -> bytes:
-    async def _run():
-        communicate = edge_tts.Communicate(text, voice)
-        audio_bytes = b""
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_bytes += chunk["data"]
-        return audio_bytes
+# 🔊 Native g4f audio generation — PollinationsAI only, pure g4f wrapper.
+# Model renamed from "openai-audio" (retired) to "gpt-4o-mini-audio".
+def generate_audio_native(prompt: str):
+    if PollinationsAI is None:
+        return None, "PollinationsAI provider not available in this g4f install."
 
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(_run())
-    finally:
-        loop.close()
-
-
-def generate_audio_native(prompt: str):
-    errors = []
-
-    if edge_tts is not None:
-        try:
-            audio_bytes = _edge_tts_generate_sync(prompt, voice="hi-IN-MadhurNeural")
-            if audio_bytes:
-                return audio_bytes, None
-        except Exception as e:
-            errors.append(f"edge_tts (direct) failed: {e}")
-
-    if OpenAIFM is not None:
-        try:
-            client = G4FClient(provider=OpenAIFM)
-            response = client.media.generate(
-                prompt,
-                model="gpt-4o-mini-tts",
-                audio={"voice": "coral"},
-            )
-            item = response.data[0]
-            if getattr(item, "b64_json", None):
-                return base64.b64decode(item.b64_json), None
-            if getattr(item, "url", None):
-                r = requests.get(item.url, timeout=20)
-                if r.ok:
-                    return r.content, None
-        except Exception as e:
-            errors.append(f"OpenAIFM failed: {e}")
-
-    if PollinationsAI is not None:
-        try:
-            client = G4FClient(provider=PollinationsAI)
-            response = client.media.generate(
-                prompt,
-                model="gpt-4o-mini-audio",
-                audio={"voice": "alloy", "format": "mp3"},
-            )
-            item = response.data[0]
-            if getattr(item, "b64_json", None):
-                return base64.b64decode(item.b64_json), None
-            if getattr(item, "url", None):
-                r = requests.get(item.url, timeout=20)
-                if r.ok:
-                    return r.content, None
-        except Exception as e:
-            errors.append(f"PollinationsAI failed: {e}")
-
-    return None, " | ".join(errors) if errors else "Koi audio provider available nahi hai."
+        client = G4FClient(provider=PollinationsAI)
+        response = client.media.generate(
+            prompt,
+            model="gpt-4o-mini-audio",
+            audio={"voice": "alloy", "format": "mp3"},
+        )
+        item = response.data[0]
+        if getattr(item, "b64_json", None):
+            return base64.b64decode(item.b64_json), None
+        if getattr(item, "url", None):
+            r = requests.get(item.url, timeout=20)
+            if r.ok:
+                return r.content, None
+        return None, "PollinationsAI returned no usable audio data (no b64_json or url)."
+    except Exception as e:
+        return None, f"PollinationsAI audio failed: {e}"
 
 
 # 💡 Web/Image/Audio triggers
@@ -303,7 +245,7 @@ def handle_triggered_response(text):
             reply_text = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch nahi mila.")
             reply_text = strip_reasoning(reply_text)
             
-            # 2. Convert to Audio (direct edge_tts -> OpenAIFM -> PollinationsAI)
+            # 2. Convert to Audio using native g4f audio (PollinationsAI, gpt-4o-mini-audio)
             audio_data, err = generate_audio_native(reply_text)
             if audio_data is None:
                 return f"❌ Audio banne mein error aa gaya majdoor bhai: {err}"
