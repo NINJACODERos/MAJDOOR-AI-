@@ -1,4 +1,5 @@
 import sys, os, re, time, io, base64, asyncio, requests, streamlit as st
+from yt_dlp import YoutubeDL
 import edge_tts
 
 # 🔧 Point g4f's cookie/HAR storage at a writable directory (Streamlit Cloud's
@@ -238,6 +239,32 @@ def generate_audio_native(prompt: str):
         return None, str(e)
 
 
+def search_youtube(query):
+    try:
+        ydl_opts = {
+            "quiet": True,
+            "extract_flat": True,
+            "default_search": "ytsearch1",
+        }
+
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(query, download=False)
+
+        if "entries" in info and info["entries"]:
+            vid = info["entries"][0]["id"]
+            title = info["entries"][0]["title"]
+
+            return {
+                "url": f"https://www.youtube.com/watch?v={vid}",
+                "title": title
+            }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    return None
+
+
 # 💡 Web/Image/Audio triggers
 def handle_triggered_response(text):
     # Case-insensitive "audio/ " prefix handling
@@ -316,6 +343,21 @@ def handle_triggered_response(text):
                 pass
         return f"❌ {error} 🧑‍💻🐛"
 
+    # Prefix play/: YouTube video search
+    elif text.startswith("play/ "):
+        query = text[6:].strip()
+
+        result = search_youtube(query)
+
+        if result and "url" in result:
+            return {
+                "type": "youtube",
+                "url": result["url"],
+                "title": result["title"]
+            }
+
+        return "❌ Video nahi mila."
+
     return None
 
 
@@ -325,7 +367,13 @@ if user_input:
     trig = handle_triggered_response(user_input.strip())
     
     if trig:
-        if isinstance(trig, dict) and "audio" in trig:
+        if isinstance(trig, dict) and trig.get("type") == "youtube":
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": f"▶️ Playing: {trig['title']}",
+                "youtube": trig["url"]
+            })
+        elif isinstance(trig, dict) and "audio" in trig:
             response_text = add_sarcasm_emoji(trig["text"])
             st.session_state.chat_history.append({
                 "role": "assistant", 
@@ -350,6 +398,8 @@ for msg in st.session_state.chat_history:
     role = "🌼" if msg["role"] == "user" else "🌀"
     with st.chat_message(msg["role"], avatar=role):
         st.write(msg["content"])
+        if "youtube" in msg:
+            st.video(msg["youtube"])
         if "audio" in msg and msg["audio"]:
             # Fix: Auto-play audio using base64 encoding
             audio_b64 = base64.b64encode(msg["audio"]).decode()
