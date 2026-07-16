@@ -1,8 +1,9 @@
+youtube-search-python==1.6.6
+requests==2.31.0
+httpx==0.27.0
 streamlit
 g4f[image]
-requests
 ddgs
 duckduckai
 duck-chat
 edge-tts
-youtube-search-python
