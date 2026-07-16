@@ -1,12 +1,10 @@
-streamlit
-g4f
+
 beautifulsoup4
-pillow
 aiohttp
 requests
 ddgs
 g4f[image]
-duckduckai
-duck-chat
-DDGS
-gTTS
+streamlit==1.36.0
+g4f[all]==0.3.1.2
+nest_asyncio
+Pillow
