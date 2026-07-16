@@ -1,13 +1,9 @@
 streamlit
-g4f[image]
+git+https://github.com/xtekky/gpt4free.git
 requests
 ddgs
-
-# Duck.ai (optional)
 duckduckai
 duck-chat
-
-# Audio dependencies used by newer g4f providers
 httpx
 aiohttp
 pydub
