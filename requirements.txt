@@ -3,6 +3,6 @@ beautifulsoup4
 aiohttp
 requests
 streamlit
-g4f[all]
+g4f
 nest_asyncio
 Pillow
